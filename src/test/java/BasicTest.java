@@ -1,17 +1,9 @@
-import java.lang.foreign.Arena;
-import java.lang.foreign.FunctionDescriptor;
-import java.lang.foreign.Linker;
-import java.lang.foreign.MemoryLayout;
-import java.lang.foreign.MemorySegment;
-import java.lang.foreign.SymbolLookup;
-import java.lang.foreign.ValueLayout;
-import java.lang.invoke.MethodHandle;
-import java.net.URISyntaxException;
-import java.nio.file.Path;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
-public class Main {
-
-    public static void main(String[] args) throws Throwable {
+public class BasicTest {
+    @Test
+    void testJsonnet() {
         var example = """
                 /* A C-style comment. */
                 # A Python-style comment.
@@ -49,7 +41,8 @@ public class Main {
         try (Jsonnet jsonnet = new Jsonnet("libjsonnet.so.0.21.0")) {
             var result = jsonnet.evaluate(example);
             System.out.println(result);
+        } catch (Throwable e) {
+            Assertions.fail(e);
         }
     }
-
 }
