@@ -1,3 +1,7 @@
+import jakarta.json.Json;
+import jakarta.json.JsonValue;
+
+import java.io.ByteArrayInputStream;
 import java.io.Closeable;
 import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;
@@ -7,6 +11,8 @@ import java.lang.foreign.SymbolLookup;
 import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
 import java.nio.file.Path;
+
+import static java.lang.foreign.ValueLayout.JAVA_BYTE;
 
 public class Jsonnet implements Closeable {
 
@@ -40,18 +46,34 @@ public class Jsonnet implements Closeable {
         this.blank = arena.allocateUtf8String("");
     }
 
+    private byte[] readNullTerminatedBuffer(MemorySegment segment) {
+        var resized = segment.reinterpret(Integer.MAX_VALUE);
+        for (int i = 0; i < Integer.MAX_VALUE; i++) {
+            byte curr = resized.get(JAVA_BYTE, i);
+            if (curr == 0) {
+                var content = new byte[i];
+                MemorySegment.copy(resized, JAVA_BYTE, 0, content, 0, i);
+                return content;
+            }
+        }
+        throw new UnsupportedOperationException("string exceeds maximum supported length of " + Integer.MAX_VALUE);
+    }
+
+
     //char *jsonnet_evaluate_snippet(struct JsonnetVm *vm, const char *filename, const char *snippet, int *error);
-    public String evaluate(String snippet) throws Throwable {
-        var snippetPointer = arena.allocateUtf8String(snippet);
-        var errorCodePointer = arena.allocate(ValueLayout.JAVA_LONG);
-        var result = (MemorySegment) evaluate.invokeExact(engine, blank, snippetPointer, errorCodePointer);
-        var errorResult = errorCodePointer.get(ValueLayout.JAVA_LONG, 0);
+    public JsonValue evaluate(String snippet) throws Throwable {
+        var snippetIn = arena.allocateUtf8String(snippet);
+        var errorCodeOut = arena.allocate(ValueLayout.JAVA_LONG);
+        var resultOut = (MemorySegment) evaluate.invokeExact(engine, blank, snippetIn, errorCodeOut);
+        var errorResult = errorCodeOut.get(ValueLayout.JAVA_LONG, 0);
         if (errorResult != 0) {
             throw new IllegalStateException("error code: " + errorResult);
         }
-        var copied = result.reinterpret(Integer.MAX_VALUE).getUtf8String(0);
-        release(result);
-        return copied;
+        var content = readNullTerminatedBuffer(resultOut);
+        release(resultOut);
+        try (var jr = Json.createReader(new ByteArrayInputStream(content))) {
+            return jr.readValue();
+        }
     }
 
     private void release(MemorySegment snippet) throws Throwable {

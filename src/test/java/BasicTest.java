@@ -1,5 +1,9 @@
+import jakarta.json.Json;
+import jakarta.json.stream.JsonGenerator;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+
+import java.util.Map;
 
 public class BasicTest {
     @Test
@@ -39,8 +43,11 @@ public class BasicTest {
                 }
                 """;
         try (Jsonnet jsonnet = new Jsonnet("libjsonnet.so.0.21.0")) {
-            var result = jsonnet.evaluate(example);
-            System.out.println(result);
+            var jsonObject = jsonnet.evaluate(example);
+            var writerFactory = Json.createWriterFactory(Map.of(JsonGenerator.PRETTY_PRINTING, true));
+            var writer = writerFactory.createWriter(System.out);
+            writer.write(jsonObject);
+
         } catch (Throwable e) {
             Assertions.fail(e);
         }
